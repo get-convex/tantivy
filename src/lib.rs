@@ -127,6 +127,7 @@ mod future_result;
 ///
 /// Tantivy uses [`time`](https://crates.io/crates/time) for dates.
 pub use time;
+pub use tantivy_fst;
 
 use crate::time::format_description::well_known::Rfc3339;
 use crate::time::{OffsetDateTime, PrimitiveDateTime, UtcOffset};
