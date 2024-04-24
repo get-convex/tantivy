@@ -1,7 +1,7 @@
 use crate::indexer::operation::AddOperation;
 use crate::indexer::segment_updater::save_metas;
 use crate::indexer::SegmentWriter;
-use crate::{Directory, Document, Index, IndexMeta, Opstamp, Segment};
+use crate::{Directory, DocId, Document, Index, IndexMeta, Opstamp, Segment};
 
 #[doc(hidden)]
 pub struct SingleSegmentIndexWriter {
@@ -25,11 +25,13 @@ impl SingleSegmentIndexWriter {
         self.segment_writer.mem_usage()
     }
 
-    pub fn add_document(&mut self, document: Document) -> crate::Result<()> {
+    pub fn add_document(&mut self, document: Document) -> crate::Result<DocId> {
         let opstamp = self.opstamp;
         self.opstamp += 1;
+        let doc_id = self.segment_writer.max_doc();
         self.segment_writer
-            .add_document(AddOperation { opstamp, document })
+            .add_document(AddOperation { opstamp, document })?;
+        Ok(doc_id)
     }
 
     pub fn finalize(self) -> crate::Result<Index> {
