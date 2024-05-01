@@ -25,7 +25,7 @@ impl TermScorer {
         }
     }
 
-    pub(crate) fn shallow_seek(&mut self, target_doc: DocId) {
+    pub fn shallow_seek(&mut self, target_doc: DocId) {
         self.postings.block_cursor.shallow_seek(target_doc);
     }
 
