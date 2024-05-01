@@ -23,14 +23,14 @@ fn max_score<I: Iterator<Item = Score>>(mut it: I) -> Option<Score> {
 /// use cases, you should prefer using `SegmentPostings` for most usage.
 #[derive(Clone)]
 pub struct BlockSegmentPostings {
-    pub(crate) doc_decoder: BlockDecoder,
+    pub doc_decoder: BlockDecoder,
     loaded_offset: usize,
     freq_decoder: BlockDecoder,
     freq_reading_option: FreqReadingOption,
     block_max_score_cache: Option<Score>,
     doc_freq: u32,
     data: OwnedBytes,
-    pub(crate) skip_reader: SkipReader,
+    pub skip_reader: SkipReader,
 }
 
 fn decode_bitpacked_block(
@@ -78,7 +78,7 @@ fn split_into_skips_and_postings(
 }
 
 impl BlockSegmentPostings {
-    pub(crate) fn open(
+    pub fn open(
         doc_freq: u32,
         data: FileSlice,
         record_option: IndexRecordOption,
@@ -150,7 +150,7 @@ impl BlockSegmentPostings {
         bm25_weight.max_score()
     }
 
-    pub(crate) fn freq_reading_option(&self) -> FreqReadingOption {
+    pub fn freq_reading_option(&self) -> FreqReadingOption {
         self.freq_reading_option
     }
 
@@ -164,7 +164,7 @@ impl BlockSegmentPostings {
     // # Warning
     //
     // This does not reset the positions list.
-    pub(crate) fn reset(&mut self, doc_freq: u32, postings_data: OwnedBytes) -> io::Result<()> {
+    pub fn reset(&mut self, doc_freq: u32, postings_data: OwnedBytes) -> io::Result<()> {
         let (skip_data_opt, postings_data) =
             split_into_skips_and_postings(doc_freq, postings_data)?;
         self.data = postings_data;
@@ -207,7 +207,7 @@ impl BlockSegmentPostings {
     ///
     /// This method is useful to run SSE2 linear search.
     #[inline]
-    pub(crate) fn full_block(&self) -> &[DocId; COMPRESSION_BLOCK_SIZE] {
+    pub fn full_block(&self) -> &[DocId; COMPRESSION_BLOCK_SIZE] {
         debug_assert!(self.block_is_loaded());
         self.doc_decoder.full_output()
     }
@@ -252,7 +252,7 @@ impl BlockSegmentPostings {
         self.load_block();
     }
 
-    pub(crate) fn position_offset(&self) -> u64 {
+    pub fn position_offset(&self) -> u64 {
         self.skip_reader.position_offset()
     }
 
@@ -262,17 +262,17 @@ impl BlockSegmentPostings {
     /// `.load_block()` needs to be called manually afterwards.
     /// If all docs are smaller than target, the block loaded may be empty,
     /// or be the last an incomplete VInt block.
-    pub(crate) fn shallow_seek(&mut self, target_doc: DocId) {
+    pub fn shallow_seek(&mut self, target_doc: DocId) {
         if self.skip_reader.seek(target_doc) {
             self.block_max_score_cache = None;
         }
     }
 
-    pub(crate) fn block_is_loaded(&self) -> bool {
+    pub fn block_is_loaded(&self) -> bool {
         self.loaded_offset == self.skip_reader.byte_offset()
     }
 
-    pub(crate) fn load_block(&mut self) {
+    pub fn load_block(&mut self) {
         let offset = self.skip_reader.byte_offset();
         if self.loaded_offset == offset {
             return;
