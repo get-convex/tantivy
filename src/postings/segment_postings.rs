@@ -14,7 +14,7 @@ use crate::{DocId, TERMINATED};
 /// Positions on the other hand, are optionally entirely decoded upfront.
 #[derive(Clone)]
 pub struct SegmentPostings {
-    pub(crate) block_cursor: BlockSegmentPostings,
+    pub block_cursor: BlockSegmentPostings,
     cur: usize,
     position_reader: Option<PositionReader>,
 }
