@@ -49,7 +49,7 @@ impl AliveBitSet {
         Self::open(alive_bitset_bytes)
     }
 
-    pub(crate) fn from_bitset(bitset: &BitSet) -> AliveBitSet {
+    pub fn from_bitset(bitset: &BitSet) -> AliveBitSet {
         let readonly_bitset = ReadOnlyBitSet::from(bitset);
         AliveBitSet::from(readonly_bitset)
     }
