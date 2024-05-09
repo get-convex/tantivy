@@ -1028,7 +1028,7 @@ impl IndexMerger {
     ///
     /// # Returns
     /// The number of documents in the resulting segment.
-    pub fn write(&self, mut serializer: SegmentSerializer) -> crate::Result<u32> {
+    pub fn write(&self, mut serializer: SegmentSerializer) -> crate::Result<(u32, SegmentDocIdMapping)> {
         let doc_id_mapping = if let Some(sort_by_field) = self.index_settings.sort_by_field.as_ref()
         {
             // If the documents are already sorted and stackable, we ignore the mapping and execute
@@ -1065,7 +1065,7 @@ impl IndexMerger {
         self.write_storable_fields(serializer.get_store_writer(), &doc_id_mapping)?;
         debug!("close-serializer");
         serializer.close()?;
-        Ok(self.max_doc)
+        Ok((self.max_doc, doc_id_mapping))
     }
 }
 

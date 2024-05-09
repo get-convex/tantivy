@@ -9,6 +9,7 @@ use std::sync::{Arc, RwLock};
 use fail::fail_point;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
+use super::doc_id_mapping::SegmentDocIdMapping;
 use super::segment_manager::SegmentManager;
 use crate::core::{
     Index, IndexMeta, IndexSettings, Segment, SegmentId, SegmentMeta, META_FILEPATH,
@@ -123,7 +124,7 @@ fn merge(
     // ... we just serialize this index merger in our new segment to merge the segments.
     let segment_serializer = SegmentSerializer::for_segment(merged_segment.clone(), true)?;
 
-    let num_docs = merger.write(segment_serializer)?;
+    let (num_docs, _doc_id_mapping) = merger.write(segment_serializer)?;
 
     let merged_segment_id = merged_segment.id();
 
@@ -173,7 +174,8 @@ pub fn merge_indices<T: Into<Box<dyn Directory>>>(
     }
 
     let non_filter = segments.iter().map(|_| None).collect::<Vec<_>>();
-    merge_filtered_segments(&segments, target_settings, non_filter, output_directory)
+    let (index, _) = merge_filtered_segments(&segments, target_settings, non_filter, output_directory)?;
+    Ok(index)
 }
 
 /// Advanced: Merges a list of segments from different indices in a new index.
@@ -194,7 +196,7 @@ pub fn merge_filtered_segments<T: Into<Box<dyn Directory>>>(
     target_settings: IndexSettings,
     filter_doc_ids: Vec<Option<AliveBitSet>>,
     output_directory: T,
-) -> crate::Result<Index> {
+) -> crate::Result<(Index, SegmentDocIdMapping)> {
     if segments.is_empty() {
         // If there are no indices to merge, there is no need to do anything.
         return Err(crate::TantivyError::InvalidArgument(
@@ -229,7 +231,7 @@ pub fn merge_filtered_segments<T: Into<Box<dyn Directory>>>(
         filter_doc_ids,
     )?;
     let segment_serializer = SegmentSerializer::for_segment(merged_segment, true)?;
-    let num_docs = merger.write(segment_serializer)?;
+    let (num_docs, doc_id_mapping) = merger.write(segment_serializer)?;
 
     let segment_meta = merged_index.new_segment_meta(merged_segment_id, num_docs);
 
@@ -256,7 +258,7 @@ pub fn merge_filtered_segments<T: Into<Box<dyn Directory>>>(
     // save the meta.json
     save_metas(&index_meta, merged_index.directory_mut())?;
 
-    Ok(merged_index)
+    Ok((merged_index, doc_id_mapping))
 }
 
 pub(crate) struct InnerSegmentUpdater {
@@ -951,7 +953,7 @@ mod tests {
 
         let filter_segments = vec![Some(filter_segment_1), Some(filter_segment_2)];
 
-        let merged_index = merge_filtered_segments(
+        let (merged_index, _) = merge_filtered_segments(
             &segments,
             target_settings,
             filter_segments,
@@ -996,7 +998,7 @@ mod tests {
 
         let filter_segments = vec![Some(filter_segment)];
 
-        let index = merge_filtered_segments(
+        let (index, _) = merge_filtered_segments(
             &segments,
             target_settings,
             filter_segments,

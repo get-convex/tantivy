@@ -9,7 +9,7 @@ use crate::{DocAddress, DocId, IndexSortByField, Order, TantivyError};
 
 /// Struct to provide mapping from new doc_id to old doc_id and segment.
 #[derive(Clone)]
-pub(crate) struct SegmentDocIdMapping {
+pub struct SegmentDocIdMapping {
     new_doc_id_to_old_doc_addr: Vec<DocAddress>,
     is_trivial: bool,
 }
