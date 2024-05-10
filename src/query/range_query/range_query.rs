@@ -1,7 +1,7 @@
 use std::io;
 use std::ops::{Bound, Range};
 
-use common::{BinarySerializable, BitSet};
+use common::{BinarySerializable, MutableBitSet};
 
 use super::range_query_u64_fastfield::FastFieldRangeWeight;
 use crate::core::SegmentReader;
@@ -377,7 +377,7 @@ impl RangeWeight {
 impl Weight for RangeWeight {
     fn scorer(&self, reader: &SegmentReader, boost: Score) -> crate::Result<Box<dyn Scorer>> {
         let max_doc = reader.max_doc();
-        let mut doc_bitset = BitSet::with_max_value(max_doc);
+        let mut doc_bitset = MutableBitSet::with_max_value(max_doc);
 
         let inverted_index = reader.inverted_index(reader.schema().get_field(&self.field)?)?;
         let term_dict = inverted_index.terms();

@@ -175,7 +175,7 @@ impl TinySet {
 }
 
 #[derive(Clone)]
-pub struct BitSet {
+pub struct MutableBitSet {
     tinysets: Box<[TinySet]>,
     len: u64,
     max_value: u32,
@@ -185,7 +185,7 @@ fn num_buckets(max_val: u32) -> u32 {
     (max_val + 63u32) / 64u32
 }
 
-impl BitSet {
+impl MutableBitSet {
     /// serialize a `BitSet`.
     pub fn serialize<T: Write>(&self, writer: &mut T) -> io::Result<()> {
         writer.write_all(self.max_value.to_le_bytes().as_ref())?;
@@ -198,10 +198,10 @@ impl BitSet {
 
     /// Create a new `BitSet` that may contain elements
     /// within `[0, max_val)`.
-    pub fn with_max_value(max_value: u32) -> BitSet {
+    pub fn with_max_value(max_value: u32) -> MutableBitSet {
         let num_buckets = num_buckets(max_value);
         let tinybitsets = vec![TinySet::empty(); num_buckets as usize].into_boxed_slice();
-        BitSet {
+        MutableBitSet {
             tinysets: tinybitsets,
             len: 0,
             max_value,
@@ -210,7 +210,7 @@ impl BitSet {
 
     /// Create a new `BitSet` that may contain elements. Initially all values will be set.
     /// within `[0, max_val)`.
-    pub fn with_max_value_and_full(max_value: u32) -> BitSet {
+    pub fn with_max_value_and_full(max_value: u32) -> MutableBitSet {
         let num_buckets = num_buckets(max_value);
         let mut tinybitsets = vec![TinySet::full(); num_buckets as usize].into_boxed_slice();
 
@@ -219,7 +219,7 @@ impl BitSet {
         if lower != 0 {
             tinybitsets[tinybitsets.len() - 1] = TinySet::range_lower(lower);
         }
-        BitSet {
+        MutableBitSet {
             tinysets: tinybitsets,
             len: max_value as u64,
             max_value,
@@ -247,12 +247,6 @@ impl BitSet {
         }
     }
 
-    /// Returns the number of elements in the `BitSet`.
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.len as usize
-    }
-
     /// Inserts an element in the `BitSet`
     #[inline]
     pub fn insert(&mut self, el: u32) {
@@ -275,31 +269,6 @@ impl BitSet {
     #[inline]
     pub fn contains(&self, el: u32) -> bool {
         self.tinyset(el / 64u32).contains(el % 64)
-    }
-
-    /// Returns the first non-empty `TinySet` associated with a bucket lower
-    /// or greater than bucket.
-    ///
-    /// Reminder: the tiny set with the bucket `bucket`, represents the
-    /// elements from `bucket * 64` to `(bucket+1) * 64`.
-    pub fn first_non_empty_bucket(&self, bucket: u32) -> Option<u32> {
-        self.tinysets[bucket as usize..]
-            .iter()
-            .cloned()
-            .position(|tinyset| !tinyset.is_empty())
-            .map(|delta_bucket| bucket + delta_bucket as u32)
-    }
-
-    #[inline]
-    pub fn max_value(&self) -> u32 {
-        self.max_value
-    }
-
-    /// Returns the tiny bitset representing the
-    /// the set restricted to the number range from
-    /// `bucket * 64` to `(bucket + 1) * 64`.
-    pub fn tinyset(&self, bucket: u32) -> TinySet {
-        self.tinysets[bucket as usize]
     }
 }
 
@@ -333,14 +302,6 @@ impl ReadOnlyBitSet {
         assert_eq!(data.len() % 8, 0);
         let max_value: u32 = u32::from_le_bytes(max_value_data.as_ref().try_into().unwrap());
         ReadOnlyBitSet { data, max_value }
-    }
-
-    /// Number of elements in the bitset.
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.iter_tinysets()
-            .map(|tinyset| tinyset.len() as usize)
-            .sum()
     }
 
     /// Iterate the tinyset on the fly from serialized data.
@@ -391,13 +352,83 @@ impl ReadOnlyBitSet {
     }
 }
 
-impl<'a> From<&'a BitSet> for ReadOnlyBitSet {
-    fn from(bitset: &'a BitSet) -> ReadOnlyBitSet {
+impl<'a> From<&'a MutableBitSet> for ReadOnlyBitSet {
+    fn from(bitset: &'a MutableBitSet) -> ReadOnlyBitSet {
         let mut buffer = Vec::with_capacity(bitset.tinysets.len() * 8 + 4);
         bitset
             .serialize(&mut buffer)
             .expect("serializing into a buffer should never fail");
         ReadOnlyBitSet::open(OwnedBytes::new(buffer))
+    }
+}
+
+pub trait BitSet: Send {
+    /// Returns the first non-empty `TinySet` associated with a bucket lower
+    /// or greater than bucket.
+    ///
+    /// Reminder: the tiny set with the bucket `bucket`, represents the
+    /// elements from `bucket * 64` to `(bucket+1) * 64`.
+    fn first_non_empty_bucket(&self, bucket: u32) -> Option<u32>;
+
+    /// Returns the tiny bitset representing the
+    /// the set restricted to the number range from
+    /// `bucket * 64` to `(bucket + 1) * 64`.
+    fn tinyset(&self, bucket: u32) -> TinySet;
+
+    fn max_value(&self) -> u32;
+    fn len(&self) -> usize;
+}
+
+impl BitSet for MutableBitSet {
+    fn first_non_empty_bucket(&self, bucket: u32) -> Option<u32> {
+        self.tinysets[bucket as usize..]
+            .iter()
+            .cloned()
+            .position(|tinyset| !tinyset.is_empty())
+            .map(|delta_bucket| bucket + delta_bucket as u32)
+    }
+
+    #[inline]
+    fn max_value(&self) -> u32 {
+        self.max_value
+    }
+
+    fn tinyset(&self, bucket: u32) -> TinySet {
+        self.tinysets[bucket as usize]
+    }
+
+    /// Returns the number of elements in the `BitSet`.
+    #[inline]
+    fn len(&self) -> usize {
+        self.len as usize
+    }
+}
+
+impl BitSet for ReadOnlyBitSet {
+    fn first_non_empty_bucket(&self, bucket: u32) -> Option<u32> {
+        self.data[(bucket as usize * 8)..]
+            .chunks_exact(8)
+            .map(|c| TinySet::deserialize(c.try_into().unwrap()))
+            .position(|tinyset| !tinyset.is_empty())
+            .map(|delta_bucket| bucket + delta_bucket as u32)
+    }
+
+    #[inline]
+    fn max_value(&self) -> u32 {
+        self.max_value
+    }
+
+    fn tinyset(&self, bucket: u32) -> TinySet {
+        let byte_offset = bucket as usize * 8;
+        let chunk = self.data[byte_offset..byte_offset + 8].try_into().unwrap();
+        TinySet::deserialize(chunk)
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.iter_tinysets()
+            .map(|tinyset| tinyset.len() as usize)
+            .sum()
     }
 }
 
@@ -411,12 +442,12 @@ mod tests {
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
 
-    use super::{BitSet, ReadOnlyBitSet, TinySet};
+    use super::{MutableBitSet, ReadOnlyBitSet, TinySet};
 
     #[test]
     fn test_read_serialized_bitset_full_multi() {
         for i in 0..1000 {
-            let bitset = BitSet::with_max_value_and_full(i);
+            let bitset = MutableBitSet::with_max_value_and_full(i);
             let mut out = vec![];
             bitset.serialize(&mut out).unwrap();
 
@@ -427,7 +458,7 @@ mod tests {
 
     #[test]
     fn test_read_serialized_bitset_full_block() {
-        let bitset = BitSet::with_max_value_and_full(64);
+        let bitset = MutableBitSet::with_max_value_and_full(64);
         let mut out = vec![];
         bitset.serialize(&mut out).unwrap();
 
@@ -437,7 +468,7 @@ mod tests {
 
     #[test]
     fn test_read_serialized_bitset_full() {
-        let mut bitset = BitSet::with_max_value_and_full(5);
+        let mut bitset = MutableBitSet::with_max_value_and_full(5);
         bitset.remove(3);
         let mut out = vec![];
         bitset.serialize(&mut out).unwrap();
@@ -449,7 +480,7 @@ mod tests {
     #[test]
     fn test_bitset_intersect() {
         let bitset_serialized = {
-            let mut bitset = BitSet::with_max_value_and_full(5);
+            let mut bitset = MutableBitSet::with_max_value_and_full(5);
             bitset.remove(1);
             bitset.remove(3);
             let mut out = vec![];
@@ -458,7 +489,7 @@ mod tests {
             ReadOnlyBitSet::open(OwnedBytes::new(out))
         };
 
-        let mut bitset = BitSet::with_max_value_and_full(5);
+        let mut bitset = MutableBitSet::with_max_value_and_full(5);
         bitset.remove(1);
         bitset.intersect_update(&bitset_serialized);
 
@@ -488,7 +519,7 @@ mod tests {
 
     #[test]
     fn test_read_serialized_bitset_empty() {
-        let mut bitset = BitSet::with_max_value(5);
+        let mut bitset = MutableBitSet::with_max_value(5);
         bitset.insert(3);
         let mut out = vec![];
         bitset.serialize(&mut out).unwrap();
@@ -497,7 +528,7 @@ mod tests {
         assert_eq!(bitset.len(), 1);
 
         {
-            let bitset = BitSet::with_max_value(5);
+            let bitset = MutableBitSet::with_max_value(5);
             let mut out = vec![];
             bitset.serialize(&mut out).unwrap();
             let bitset = ReadOnlyBitSet::open(OwnedBytes::new(out));
@@ -574,7 +605,7 @@ mod tests {
     fn test_bitset() {
         let test_against_hashset = |els: &[u32], max_value: u32| {
             let mut hashset: HashSet<u32> = HashSet::new();
-            let mut bitset = BitSet::with_max_value(max_value);
+            let mut bitset = MutableBitSet::with_max_value(max_value);
             for &el in els {
                 assert!(el < max_value);
                 hashset.insert(el);
@@ -646,7 +677,7 @@ mod tests {
 
     #[test]
     fn test_bitset_len() {
-        let mut bitset = BitSet::with_max_value(1_000);
+        let mut bitset = MutableBitSet::with_max_value(1_000);
         assert_eq!(bitset.len(), 0);
         bitset.insert(3u32);
         assert_eq!(bitset.len(), 1);
@@ -683,7 +714,7 @@ mod tests {
 
     #[test]
     fn test_bitset_clear() {
-        let mut bitset = BitSet::with_max_value(1_000);
+        let mut bitset = MutableBitSet::with_max_value(1_000);
         let els = sample(1_000, 0.01f64);
         for &el in &els {
             bitset.insert(el);
@@ -701,7 +732,7 @@ mod bench {
 
     use test;
 
-    use super::{BitSet, TinySet};
+    use super::{MutableBitSet, TinySet};
 
     #[bench]
     fn bench_tinyset_pop(b: &mut test::Bencher) {
@@ -732,6 +763,6 @@ mod bench {
 
     #[bench]
     fn bench_bitset_initialize(b: &mut test::Bencher) {
-        b.iter(|| BitSet::with_max_value(1_000_000));
+        b.iter(|| MutableBitSet::with_max_value(1_000_000));
     }
 }

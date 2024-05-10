@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use common::{BitSet, GroupByIteratorExtended, OwnedBytes};
+use common::{MutableBitSet, GroupByIteratorExtended, OwnedBytes};
 
 use super::{serialize_dense_codec, DenseCodec};
 
@@ -374,7 +374,7 @@ pub fn serialize_sparse_codec<W: Write>(
                 out.write_all(val_in_block.to_le_bytes().as_ref())?;
             }
         } else {
-            let mut bitset = BitSet::with_max_value(ELEMENTS_PER_BLOCK + 1);
+            let mut bitset = MutableBitSet::with_max_value(ELEMENTS_PER_BLOCK + 1);
             for val_in_block in current_block.iter() {
                 bitset.insert(*val_in_block as u32);
             }
