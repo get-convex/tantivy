@@ -7,7 +7,7 @@ mod segment;
 mod segment_component;
 mod segment_id;
 mod segment_reader;
-mod single_segment_index_writer;
+pub mod single_segment_index_writer;
 
 use std::path::Path;
 
