@@ -30,6 +30,10 @@ impl SegmentDocIdMapping {
         self.new_doc_id_to_old_doc_addr.iter().copied()
     }
 
+    pub fn iter_old_doc_addrs_enumerated(&self) -> impl Iterator<Item = (DocId, DocAddress)> + '_ {
+        self.new_doc_id_to_old_doc_addr.iter().enumerate().map(|(i, addr)| (i as DocId, *addr))
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.new_doc_id_to_old_doc_addr.len()
     }
