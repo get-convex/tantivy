@@ -34,7 +34,7 @@ impl SegmentDocIdMapping {
         self.new_doc_id_to_old_doc_addr.iter().enumerate().map(|(i, addr)| (i as DocId, *addr))
     }
 
-    pub(crate) fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.new_doc_id_to_old_doc_addr.len()
     }
 
