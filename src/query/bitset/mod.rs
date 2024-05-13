@@ -1,4 +1,4 @@
-use common::{BitSet, TinySet};
+use common::{GenericBitSet, BitSet, TinySet};
 
 use crate::docset::{DocSet, TERMINATED};
 use crate::DocId;
@@ -12,22 +12,22 @@ use crate::DocId;
 ///
 /// TODO: Consider implementing a `BitTreeSet` in order to advance faster
 /// when the bitset is sparse
-pub struct BitSetDocSet {
-    docs: BitSet,
+pub struct BitSetDocSet<T: GenericBitSet = BitSet> {
+    docs: T,
     cursor_bucket: u32, //< index associated with the current tiny bitset
     cursor_tinybitset: TinySet,
     doc: u32,
 }
 
-impl BitSetDocSet {
+impl<T: GenericBitSet> BitSetDocSet<T> {
     fn go_to_bucket(&mut self, bucket_addr: u32) {
         self.cursor_bucket = bucket_addr;
         self.cursor_tinybitset = self.docs.tinyset(bucket_addr);
     }
 }
 
-impl From<BitSet> for BitSetDocSet {
-    fn from(docs: BitSet) -> BitSetDocSet {
+impl<T: GenericBitSet> From<T> for BitSetDocSet<T> {
+    fn from(docs: T) -> BitSetDocSet<T> {
         let first_tiny_bitset = if docs.max_value() == 0 {
             TinySet::empty()
         } else {
@@ -44,7 +44,7 @@ impl From<BitSet> for BitSetDocSet {
     }
 }
 
-impl DocSet for BitSetDocSet {
+impl<T: GenericBitSet> DocSet for BitSetDocSet<T> {
     fn advance(&mut self) -> DocId {
         if let Some(lower) = self.cursor_tinybitset.pop_lowest() {
             self.doc = (self.cursor_bucket * 64u32) | lower;

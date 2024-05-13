@@ -401,6 +401,69 @@ impl<'a> From<&'a BitSet> for ReadOnlyBitSet {
     }
 }
 
+pub trait GenericBitSet: Send {
+    /// Returns the first non-empty `TinySet` associated with a bucket lower
+    /// or greater than bucket.
+    ///
+    /// Reminder: the tiny set with the bucket `bucket`, represents the
+    /// elements from `bucket * 64` to `(bucket+1) * 64`.
+    fn first_non_empty_bucket(&self, bucket: u32) -> Option<u32>;
+    fn tinyset(&self, bucket: u32) -> TinySet;
+
+    fn max_value(&self) -> u32;
+    fn len(&self) -> usize;
+}
+
+impl GenericBitSet for BitSet {
+    #[inline]
+    fn first_non_empty_bucket(&self, bucket: u32) -> Option<u32> {
+        BitSet::first_non_empty_bucket(self, bucket)
+    }
+
+    #[inline]
+    fn max_value(&self) -> u32 {
+        BitSet::max_value(self)
+    }
+
+    #[inline]
+    fn tinyset(&self, bucket: u32) -> TinySet {
+        BitSet::tinyset(self, bucket)
+    }
+
+    /// Returns the number of elements in the `BitSet`.
+    #[inline]
+    fn len(&self) -> usize {
+        BitSet::len(self)
+    }
+}
+
+impl GenericBitSet for ReadOnlyBitSet {
+    fn first_non_empty_bucket(&self, bucket: u32) -> Option<u32> {
+        self.data[(bucket as usize * 8)..]
+            .chunks_exact(8)
+            .map(|c| TinySet::deserialize(c.try_into().unwrap()))
+            .position(|tinyset| !tinyset.is_empty())
+            .map(|delta_bucket| bucket + delta_bucket as u32)
+    }
+
+    #[inline]
+    fn max_value(&self) -> u32 {
+        self.max_value
+    }
+
+    #[inline]
+    fn tinyset(&self, bucket: u32) -> TinySet {
+        let byte_offset = bucket as usize * 8;
+        let chunk = self.data[byte_offset..byte_offset + 8].try_into().unwrap();
+        TinySet::deserialize(chunk)
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        ReadOnlyBitSet::len(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
