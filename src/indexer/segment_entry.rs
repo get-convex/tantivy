@@ -1,6 +1,6 @@
 use std::fmt;
 
-use common::MutableBitSet;
+use common::BitSet;
 
 use crate::core::{SegmentId, SegmentMeta};
 use crate::indexer::delete_queue::DeleteCursor;
@@ -19,7 +19,7 @@ use crate::indexer::delete_queue::DeleteCursor;
 #[derive(Clone)]
 pub struct SegmentEntry {
     meta: SegmentMeta,
-    alive_bitset: Option<MutableBitSet>,
+    alive_bitset: Option<BitSet>,
     delete_cursor: DeleteCursor,
 }
 
@@ -28,7 +28,7 @@ impl SegmentEntry {
     pub fn new(
         segment_meta: SegmentMeta,
         delete_cursor: DeleteCursor,
-        alive_bitset: Option<MutableBitSet>,
+        alive_bitset: Option<BitSet>,
     ) -> SegmentEntry {
         SegmentEntry {
             meta: segment_meta,
@@ -40,7 +40,7 @@ impl SegmentEntry {
     /// Return a reference to the segment entry deleted bitset.
     ///
     /// `DocId` in this bitset are flagged as deleted.
-    pub fn alive_bitset(&self) -> Option<&MutableBitSet> {
+    pub fn alive_bitset(&self) -> Option<&BitSet> {
         self.alive_bitset.as_ref()
     }
 

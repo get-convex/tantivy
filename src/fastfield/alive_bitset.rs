@@ -1,7 +1,7 @@
 use std::io;
 use std::io::Write;
 
-use common::{intersect_bitsets, MutableBitSet, OwnedBytes, ReadOnlyBitSet, BitSet};
+use common::{intersect_bitsets, BitSet, OwnedBytes, ReadOnlyBitSet, GenericBitSet};
 
 use crate::space_usage::ByteCount;
 use crate::DocId;
@@ -11,7 +11,7 @@ use crate::DocId;
 /// where `alive_bitset` is the set of alive `DocId`.
 /// Warning: this function does not call terminate. The caller is in charge of
 /// closing the writer properly.
-pub fn write_alive_bitset<T: Write>(alive_bitset: &MutableBitSet, writer: &mut T) -> io::Result<()> {
+pub fn write_alive_bitset<T: Write>(alive_bitset: &BitSet, writer: &mut T) -> io::Result<()> {
     alive_bitset.serialize(writer)?;
     Ok(())
 }
@@ -39,7 +39,7 @@ impl AliveBitSet {
     #[cfg(test)]
     pub(crate) fn for_test_from_deleted_docs(deleted_docs: &[DocId], max_doc: u32) -> AliveBitSet {
         assert!(deleted_docs.iter().all(|&doc| doc < max_doc));
-        let mut bitset = MutableBitSet::with_max_value_and_full(max_doc);
+        let mut bitset = BitSet::with_max_value_and_full(max_doc);
         for &doc in deleted_docs {
             bitset.remove(doc);
         }
@@ -49,7 +49,7 @@ impl AliveBitSet {
         Self::open(alive_bitset_bytes)
     }
 
-    pub fn from_bitset(bitset: &MutableBitSet) -> AliveBitSet {
+    pub fn from_bitset(bitset: &BitSet) -> AliveBitSet {
         let readonly_bitset = ReadOnlyBitSet::from(bitset);
         AliveBitSet::from(readonly_bitset)
     }

@@ -1,4 +1,4 @@
-use common::{BitSet, MutableBitSet, TinySet};
+use common::{GenericBitSet, BitSet, TinySet};
 
 use crate::docset::{DocSet, TERMINATED};
 use crate::DocId;
@@ -12,21 +12,21 @@ use crate::DocId;
 ///
 /// TODO: Consider implementing a `BitTreeSet` in order to advance faster
 /// when the bitset is sparse
-pub struct BitSetDocSet<T: BitSet = MutableBitSet> {
+pub struct BitSetDocSet<T: GenericBitSet = BitSet> {
     docs: T,
     cursor_bucket: u32, //< index associated with the current tiny bitset
     cursor_tinybitset: TinySet,
     doc: u32,
 }
 
-impl<T: BitSet> BitSetDocSet<T> {
+impl<T: GenericBitSet> BitSetDocSet<T> {
     fn go_to_bucket(&mut self, bucket_addr: u32) {
         self.cursor_bucket = bucket_addr;
         self.cursor_tinybitset = self.docs.tinyset(bucket_addr);
     }
 }
 
-impl<T: BitSet> From<T> for BitSetDocSet<T> {
+impl<T: GenericBitSet> From<T> for BitSetDocSet<T> {
     fn from(docs: T) -> BitSetDocSet<T> {
         let first_tiny_bitset = if docs.max_value() == 0 {
             TinySet::empty()
@@ -44,7 +44,7 @@ impl<T: BitSet> From<T> for BitSetDocSet<T> {
     }
 }
 
-impl<T: BitSet> DocSet for BitSetDocSet<T> {
+impl<T: GenericBitSet> DocSet for BitSetDocSet<T> {
     fn advance(&mut self) -> DocId {
         if let Some(lower) = self.cursor_tinybitset.pop_lowest() {
             self.doc = (self.cursor_bucket * 64u32) | lower;
@@ -96,7 +96,7 @@ impl<T: BitSet> DocSet for BitSetDocSet<T> {
 mod tests {
     use std::collections::BTreeSet;
 
-    use common::MutableBitSet;
+    use common::BitSet;
 
     use super::BitSetDocSet;
     use crate::docset::{DocSet, TERMINATED};
@@ -104,7 +104,7 @@ mod tests {
     use crate::DocId;
 
     fn create_docbitset(docs: &[DocId], max_doc: DocId) -> BitSetDocSet {
-        let mut docset = MutableBitSet::with_max_value(max_doc);
+        let mut docset = BitSet::with_max_value(max_doc);
         for &doc in docs {
             docset.insert(doc);
         }
@@ -115,7 +115,7 @@ mod tests {
     fn test_bitset_large() {
         let arr = generate_nonunique_unsorted(100_000, 5_000);
         let mut btreeset: BTreeSet<u32> = BTreeSet::new();
-        let mut bitset = MutableBitSet::with_max_value(100_000);
+        let mut bitset = BitSet::with_max_value(100_000);
         for el in arr {
             btreeset.insert(el);
             bitset.insert(el);
@@ -136,14 +136,14 @@ mod tests {
 
     #[test]
     fn test_empty() {
-        let bitset = MutableBitSet::with_max_value(1000);
+        let bitset = BitSet::with_max_value(1000);
         let mut empty = BitSetDocSet::from(bitset);
         assert_eq!(empty.advance(), TERMINATED)
     }
 
     #[test]
     fn test_seek_terminated() {
-        let bitset = MutableBitSet::with_max_value(1000);
+        let bitset = BitSet::with_max_value(1000);
         let mut empty = BitSetDocSet::from(bitset);
         assert_eq!(empty.seek(TERMINATED), TERMINATED)
     }
@@ -242,7 +242,7 @@ mod bench {
     fn bench_bitset_1pct_insert(b: &mut test::Bencher) {
         let els = tests::generate_nonunique_unsorted(1_000_000u32, 10_000);
         b.iter(|| {
-            let mut bitset = MutableBitSet::with_max_value(1_000_000);
+            let mut bitset = BitSet::with_max_value(1_000_000);
             for el in els.iter().cloned() {
                 bitset.insert(el);
             }
@@ -252,7 +252,7 @@ mod bench {
     #[bench]
     fn bench_bitset_1pct_clone(b: &mut test::Bencher) {
         let els = tests::generate_nonunique_unsorted(1_000_000u32, 10_000);
-        let mut bitset = MutableBitSet::with_max_value(1_000_000);
+        let mut bitset = BitSet::with_max_value(1_000_000);
         for el in els {
             bitset.insert(el);
         }
@@ -262,7 +262,7 @@ mod bench {
     #[bench]
     fn bench_bitset_1pct_clone_iterate(b: &mut test::Bencher) {
         let els = tests::sample(1_000_000u32, 0.01);
-        let mut bitset = MutableBitSet::with_max_value(1_000_000);
+        let mut bitset = BitSet::with_max_value(1_000_000);
         for el in els {
             bitset.insert(el);
         }

@@ -1,7 +1,7 @@
 use std::io;
 use std::sync::Arc;
 
-use common::MutableBitSet;
+use common::BitSet;
 use tantivy_fst::Automaton;
 
 use crate::core::SegmentReader;
@@ -46,7 +46,7 @@ where
 {
     fn scorer(&self, reader: &SegmentReader, boost: Score) -> crate::Result<Box<dyn Scorer>> {
         let max_doc = reader.max_doc();
-        let mut doc_bitset = MutableBitSet::with_max_value(max_doc);
+        let mut doc_bitset = BitSet::with_max_value(max_doc);
         let inverted_index = reader.inverted_index(self.field)?;
         let term_dict = inverted_index.terms();
         let mut term_stream = self.automaton_stream(term_dict)?;

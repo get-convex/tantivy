@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
 
-use common::{MutableBitSet, BitSet};
+use common::{BitSet, GenericBitSet};
 use smallvec::smallvec;
 
 use super::operation::{AddOperation, UserOperation};
@@ -78,7 +78,7 @@ pub struct IndexWriter {
 }
 
 fn compute_deleted_bitset(
-    alive_bitset: &mut MutableBitSet,
+    alive_bitset: &mut BitSet,
     segment_reader: &SegmentReader,
     delete_cursor: &mut DeleteCursor,
     doc_opstamps: &DocToOpstampMapping,
@@ -129,9 +129,9 @@ pub(crate) fn advance_deletes(
     let segment_reader = SegmentReader::open(&segment)?;
 
     let max_doc = segment_reader.max_doc();
-    let mut alive_bitset: MutableBitSet = match segment_entry.alive_bitset() {
+    let mut alive_bitset: BitSet = match segment_entry.alive_bitset() {
         Some(previous_alive_bitset) => (*previous_alive_bitset).clone(),
-        None => MutableBitSet::with_max_value_and_full(max_doc),
+        None => BitSet::with_max_value_and_full(max_doc),
     };
 
     let num_deleted_docs_before = segment.meta().num_deleted_docs();
@@ -213,7 +213,7 @@ fn apply_deletes(
     segment: &Segment,
     delete_cursor: &mut DeleteCursor,
     doc_opstamps: &[Opstamp],
-) -> crate::Result<Option<MutableBitSet>> {
+) -> crate::Result<Option<BitSet>> {
     if delete_cursor.get().is_none() {
         // if there are no delete operation in the queue, no need
         // to even open the segment.
@@ -230,7 +230,7 @@ fn apply_deletes(
     let doc_to_opstamps = DocToOpstampMapping::WithMap(doc_opstamps);
 
     let max_doc = segment.meta().max_doc();
-    let mut deleted_bitset = MutableBitSet::with_max_value_and_full(max_doc);
+    let mut deleted_bitset = BitSet::with_max_value_and_full(max_doc);
     let may_have_deletes = compute_deleted_bitset(
         &mut deleted_bitset,
         &segment_reader,
