@@ -69,6 +69,11 @@ impl InvertedIndexReader {
         &self.termdict
     }
 
+    /// Turn into a term dictionary
+    pub fn into_term_dictionary(self) -> TermDictionary {
+        self.termdict
+    }
+
     /// Resets the block segment to another position of the postings
     /// file.
     ///
