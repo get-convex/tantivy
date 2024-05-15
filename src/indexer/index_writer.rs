@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::thread;
 use std::thread::JoinHandle;
 
-use common::{BitSet, GenericBitSet};
+use common::BitSet;
 use smallvec::smallvec;
 
 use super::operation::{AddOperation, UserOperation};

@@ -1,5 +1,5 @@
 use std::convert::TryInto;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::{fmt, io, u64};
 
 use ownedbytes::OwnedBytes;
@@ -174,7 +174,7 @@ impl TinySet {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BitSet {
     tinysets: Box<[TinySet]>,
     len: u64,
@@ -194,6 +194,30 @@ impl BitSet {
         }
         writer.flush()?;
         Ok(())
+    }
+
+    pub fn deserialize(mut reader: impl Read) -> io::Result<Self> {
+        let mut max_buf = vec![0; 4];
+        reader.read_exact(&mut max_buf)?;
+        let max_value =
+            u32::from_le_bytes(max_buf.try_into().expect("Max value should be 4 bytes"));
+        let mut tinysets_buf = Vec::new();
+        reader.read_to_end(&mut tinysets_buf)?;
+        let mut tinysets = Vec::new();
+        let mut len = 0;
+        for chunk in tinysets_buf.chunks_exact(8) {
+            let slice: &[u8; 8] = chunk.try_into().unwrap();
+            let tinyset = TinySet::deserialize(slice.clone());
+            len += tinyset.len() as u64;
+            tinysets.push(tinyset);
+        }
+
+        let tinysets = tinysets.into_boxed_slice();
+        Ok(Self {
+            tinysets,
+            len,
+            max_value,
+        })
     }
 
     /// Create a new `BitSet` that may contain elements
@@ -483,8 +507,10 @@ mod tests {
             let mut out = vec![];
             bitset.serialize(&mut out).unwrap();
 
-            let bitset = ReadOnlyBitSet::open(OwnedBytes::new(out));
-            assert_eq!(bitset.len(), i as usize);
+            let read_only_bitset = ReadOnlyBitSet::open(OwnedBytes::new(out.clone()));
+            assert_eq!(read_only_bitset.len(), i as usize);
+            let bitset_deserialized = BitSet::deserialize(&out[..]).unwrap();
+            assert_eq!(bitset, bitset_deserialized);
         }
     }
 
