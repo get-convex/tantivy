@@ -1,7 +1,9 @@
+use byteorder::ReadBytesExt;
 use std::convert::TryInto;
 use std::io::{Read, Write};
 use std::{fmt, io, u64};
 
+use byteorder::LittleEndian;
 use ownedbytes::OwnedBytes;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -197,17 +199,14 @@ impl BitSet {
     }
 
     pub fn deserialize(mut reader: impl Read) -> io::Result<Self> {
-        let mut max_buf = vec![0; 4];
-        reader.read_exact(&mut max_buf)?;
-        let max_value =
-            u32::from_le_bytes(max_buf.try_into().expect("Max value should be 4 bytes"));
-        let mut tinysets_buf = Vec::new();
-        reader.read_to_end(&mut tinysets_buf)?;
-        let mut tinysets = Vec::new();
+        let max_value = reader.read_u32::<LittleEndian>()?;
+        let buckets = num_buckets(max_value);
+        let mut tinysets = Vec::with_capacity(buckets as usize);
         let mut len = 0;
-        for chunk in tinysets_buf.chunks_exact(8) {
-            let slice: &[u8; 8] = chunk.try_into().unwrap();
-            let tinyset = TinySet::deserialize(slice.clone());
+        for _ in 0..buckets {
+            let mut buf = [0; 8];
+            reader.read_exact(&mut buf);
+            let tinyset = TinySet::deserialize(buf);
             len += tinyset.len() as u64;
             tinysets.push(tinyset);
         }
