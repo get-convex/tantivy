@@ -95,7 +95,7 @@ impl FastFieldCodec for BlockwiseLinearCodec {
         let num_bits = estimated_bit_width as u64 * column.num_vals() as u64
             // function metadata per block
             + metadata_per_block as u64 * (column.num_vals() as u64 / CHUNK_SIZE as u64);
-        let num_bits_uncompressed = 64 * (column.num_vals() as u64);
+        let num_bits_uncompressed = 64 * column.num_vals() as u64;
         Some(num_bits as f32 / num_bits_uncompressed as f32)
     }
 

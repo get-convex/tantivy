@@ -149,7 +149,7 @@ impl FastFieldCodec for LinearCodec {
 
         // Extrapolate to whole column
         let num_bits = (estimated_bit_width as u64 * column.num_vals() as u64) + 64;
-        let num_bits_uncompressed = 64 * column.num_vals();
+        let num_bits_uncompressed = 64 * column.num_vals() as u64;
         Some(num_bits as f32 / num_bits_uncompressed as f32)
     }
 }
